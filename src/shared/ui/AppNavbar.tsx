@@ -1,0 +1,301 @@
+import { useEffect, useState } from 'react'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+
+interface AppNavbarProps {
+  isAuthenticated: boolean
+  isAdmin: boolean
+  userName?: string
+  isLoggingOut: boolean
+  onLogout: () => void
+}
+
+// Main navigation keeps page links and session controls in one consistent place.
+export function AppNavbar({
+  isAuthenticated,
+  isAdmin,
+  userName,
+  isLoggingOut,
+  onLogout,
+}: AppNavbarProps) {
+  const location = useLocation()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  useEffect(() => {
+    // Close the drawer after route changes so navigation feels immediate on mobile.
+    setIsMenuOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden'
+    }
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isMenuOpen])
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMenuOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+
+    return () => {
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [isMenuOpen])
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setIsMenuOpen(false)
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    [
+      'rounded-xl px-4 py-2 text-sm font-semibold transition',
+      isActive
+        ? 'bg-blue-600 text-white shadow-[0_12px_18px_-14px_rgba(15,93,227,0.9)]'
+        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900',
+    ].join(' ')
+
+  const drawerLinkClass = ({ isActive }: { isActive: boolean }) =>
+    [
+      'block rounded-xl px-4 py-3 text-sm font-semibold transition',
+      isActive
+        ? 'bg-blue-600 text-white'
+        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900',
+    ].join(' ')
+
+  const closeMenu = () => {
+    setIsMenuOpen(false)
+  }
+
+  const handleLogout = () => {
+    onLogout()
+    closeMenu()
+  }
+
+  return (
+    <>
+      <header className="fin-header-glass sticky top-0 z-40">
+        <nav className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-2.5 py-2.5 sm:px-4 sm:py-4 md:px-6">
+          <Link to="/auctions" className="group inline-flex items-center gap-3" onClick={closeMenu}>
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 text-xs font-bold text-white shadow-lg shadow-blue-200 sm:h-10 sm:w-10 sm:text-sm">
+              AH
+            </span>
+            <span className="min-w-0 max-w-[9rem] sm:max-w-none">
+              <span className="fin-title block truncate text-[1.02rem] font-bold leading-none sm:text-lg">
+                AuctionHub
+              </span>
+              <span className="fin-brand-subtitle block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-[11px] sm:tracking-[0.18em]">
+                Capital Markets
+              </span>
+            </span>
+          </Link>
+
+          <div className="hidden items-center gap-2 lg:flex">
+            <NavLink to="/auctions" className={linkClass}>
+              Auctions
+            </NavLink>
+
+            {isAdmin ? (
+              <>
+                <NavLink to="/admin/users" className={linkClass}>
+                  Admin Users
+                </NavLink>
+                <NavLink to="/admin/comments" className={linkClass}>
+                  Admin Comments
+                </NavLink>
+                <NavLink to="/admin/auctions" className={linkClass}>
+                  Admin Auctions
+                </NavLink>
+              </>
+            ) : null}
+
+            {!isAuthenticated ? (
+              <>
+                <NavLink to="/login" className={linkClass}>
+                  Login
+                </NavLink>
+                <NavLink to="/register" className={linkClass}>
+                  Register
+                </NavLink>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <NavLink to="/account" className={linkClass}>
+                  Account
+                </NavLink>
+                <span className="hidden text-sm font-semibold text-slate-700 md:inline">{userName}</span>
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  disabled={isLoggingOut}
+                  className="fin-btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLoggingOut ? 'Logging out...' : 'Logout'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 lg:hidden">
+            {isAuthenticated ? (
+              <NavLink
+                to="/account"
+                className="hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 sm:inline-flex"
+              >
+                Account
+              </NavLink>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700"
+              aria-label="Toggle navigation menu"
+              aria-expanded={isMenuOpen}
+              aria-controls="mobile-nav-drawer"
+            >
+              <span className="relative block h-3.5 w-4">
+                <span
+                  className={[
+                    'absolute left-0 top-0 block h-0.5 w-4 bg-slate-700 transition',
+                    isMenuOpen ? 'translate-y-[6px] rotate-45' : '',
+                  ].join(' ')}
+                />
+                <span
+                  className={[
+                    'absolute left-0 top-[6px] block h-0.5 w-4 bg-slate-700 transition',
+                    isMenuOpen ? 'opacity-0' : 'opacity-100',
+                  ].join(' ')}
+                />
+                <span
+                  className={[
+                    'absolute left-0 top-[12px] block h-0.5 w-4 bg-slate-700 transition',
+                    isMenuOpen ? '-translate-y-[6px] -rotate-45' : '',
+                  ].join(' ')}
+                />
+              </span>
+            </button>
+          </div>
+        </nav>
+      </header>
+
+      <button
+        type="button"
+        onClick={closeMenu}
+        className={[
+          'fixed inset-0 z-40 bg-slate-950/38 transition-opacity duration-300 lg:hidden',
+          isMenuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
+        ].join(' ')}
+        aria-label="Close navigation overlay"
+      />
+
+      <aside
+        id="mobile-nav-drawer"
+        className={[
+          'fin-mobile-drawer fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-slate-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] shadow-2xl lg:hidden',
+          'transition-transform duration-300 ease-out will-change-transform',
+          isMenuOpen
+            ? 'translate-x-0'
+            : 'pointer-events-none translate-x-full',
+        ].join(' ')}
+        aria-hidden={!isMenuOpen}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Navigation
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-800">
+              {userName ?? 'Guest Session'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={closeMenu}
+            className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700"
+            aria-label="Close menu"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-4 flex-1 space-y-3 overflow-y-auto pb-4">
+          <NavLink to="/auctions" className={drawerLinkClass} onClick={closeMenu}>
+            Auctions
+          </NavLink>
+
+          {isAuthenticated ? (
+            <NavLink to="/account" className={drawerLinkClass} onClick={closeMenu}>
+              Account
+            </NavLink>
+          ) : null}
+
+          {isAdmin ? (
+            <>
+              <p className="pt-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Admin
+              </p>
+              <NavLink to="/admin/users" className={drawerLinkClass} onClick={closeMenu}>
+                Admin Users
+              </NavLink>
+              <NavLink to="/admin/comments" className={drawerLinkClass} onClick={closeMenu}>
+                Admin Comments
+              </NavLink>
+              <NavLink to="/admin/auctions" className={drawerLinkClass} onClick={closeMenu}>
+                Admin Auctions
+              </NavLink>
+            </>
+          ) : null}
+
+          {!isAuthenticated ? (
+            <>
+              <p className="pt-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Session
+              </p>
+              <NavLink to="/login" className={drawerLinkClass} onClick={closeMenu}>
+                Login
+              </NavLink>
+              <NavLink to="/register" className={drawerLinkClass} onClick={closeMenu}>
+                Register
+              </NavLink>
+            </>
+          ) : null}
+        </div>
+
+        {isAuthenticated ? (
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="fin-btn-secondary w-full disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLoggingOut ? 'Logging out...' : 'Logout'}
+          </button>
+        ) : null}
+      </aside>
+    </>
+  )
+}
