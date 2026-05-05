@@ -11,6 +11,7 @@ import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { AdminAuctionsPage } from './pages/admin/AdminAuctionsPage'
 import { AdminCommentsPage } from './pages/admin/AdminCommentsPage'
+import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { authService } from './services/authService'
 import { isAdminUser } from './shared/lib/authRole'
@@ -82,6 +83,7 @@ function App() {
           </Route>
 
           <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<AdminDashboardPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/comments" element={<AdminCommentsPage />} />
             <Route path="/admin/auctions" element={<AdminAuctionsPage />} />

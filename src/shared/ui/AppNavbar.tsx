@@ -19,6 +19,7 @@ export function AppNavbar({
 }: AppNavbarProps) {
   const location = useLocation()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const isAdminSection = location.pathname.startsWith('/admin')
 
   useEffect(() => {
     // Close the drawer after route changes so navigation feels immediate on mobile.
@@ -118,17 +119,9 @@ export function AppNavbar({
             </NavLink>
 
             {isAdmin ? (
-              <>
-                <NavLink to="/admin/users" className={linkClass}>
-                  Admin Users
-                </NavLink>
-                <NavLink to="/admin/comments" className={linkClass}>
-                  Admin Comments
-                </NavLink>
-                <NavLink to="/admin/auctions" className={linkClass}>
-                  Admin Auctions
-                </NavLink>
-              </>
+              <NavLink to="/admin" className={linkClass}>
+                Admin Hub
+              </NavLink>
             ) : null}
 
             {!isAuthenticated ? (
@@ -145,7 +138,11 @@ export function AppNavbar({
                 <NavLink to="/account" className={linkClass}>
                   Account
                 </NavLink>
-                <span className="hidden text-sm font-semibold text-slate-700 md:inline">{userName}</span>
+                {isAdminSection ? (
+                  <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
+                    Admin mode
+                  </span>
+                ) : null}
                 <button
                   type="button"
                   onClick={onLogout}
@@ -258,14 +255,8 @@ export function AppNavbar({
               <p className="pt-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Admin
               </p>
-              <NavLink to="/admin/users" className={drawerLinkClass} onClick={closeMenu}>
-                Admin Users
-              </NavLink>
-              <NavLink to="/admin/comments" className={drawerLinkClass} onClick={closeMenu}>
-                Admin Comments
-              </NavLink>
-              <NavLink to="/admin/auctions" className={drawerLinkClass} onClick={closeMenu}>
-                Admin Auctions
+              <NavLink to="/admin" className={drawerLinkClass} onClick={closeMenu}>
+                Admin Hub
               </NavLink>
             </>
           ) : null}

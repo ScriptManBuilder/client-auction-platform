@@ -8,6 +8,11 @@ export interface AdminUserDto {
   fullName: string
   status: AdminUserStatus | string
   role?: string
+  createdAt?: string
+  userName?: string
+  username?: string
+  nickname?: string
+  nickName?: string
 }
 
 export interface AdminCommentDto {

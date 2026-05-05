@@ -20,6 +20,10 @@ export interface AuctionCommentDto {
   createdAt: string
   status?: string
   userFullName?: string
+  userEmail?: string
+  userName?: string
+  userNickname?: string
+  userNickName?: string
 }
 
 export interface AuctionReactionsDto {

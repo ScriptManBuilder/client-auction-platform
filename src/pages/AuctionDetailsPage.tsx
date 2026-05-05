@@ -5,6 +5,57 @@ import { useAuthStore } from '../features/auth/model/authStore'
 import { auctionService } from '../services/auctionService'
 import { getApiErrorMessage } from '../shared/lib/apiError'
 
+const avatarPalette = [
+  { bg: '#DBEAFE', fg: '#1E3A8A' },
+  { bg: '#DCFCE7', fg: '#166534' },
+  { bg: '#FFE4E6', fg: '#9F1239' },
+  { bg: '#FEF3C7', fg: '#92400E' },
+  { bg: '#E0E7FF', fg: '#3730A3' },
+  { bg: '#FCE7F3', fg: '#9D174D' },
+  { bg: '#CCFBF1', fg: '#115E59' },
+  { bg: '#EDE9FE', fg: '#5B21B6' },
+]
+
+const normalize = (value?: string) => value?.trim() ?? ''
+
+const extractInitial = (value: string) => {
+  const sanitized = value.replace(/[^a-zA-Zа-яА-Я0-9]/g, '')
+  return sanitized.charAt(0).toUpperCase()
+}
+
+const buildCommentAvatar = (params: {
+  fullName?: string
+  userName?: string
+  userNickname?: string
+  userNickName?: string
+  userEmail?: string
+}) => {
+  const name =
+    normalize(params.fullName) ||
+    normalize(params.userNickname) ||
+    normalize(params.userNickName) ||
+    normalize(params.userName)
+
+  const email = normalize(params.userEmail)
+  const emailLocal = email.includes('@') ? email.split('@')[0] : email
+
+  const first = extractInitial(name)
+  const second = extractInitial(emailLocal)
+  const fallback = extractInitial(name.slice(1)) || 'U'
+  const initials = `${first || 'U'}${second || fallback}`
+
+  const seed = `${name}|${email}`
+  const hash = Array.from(seed).reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  const color = avatarPalette[Math.abs(hash) % avatarPalette.length]
+
+  return {
+    initials,
+    backgroundColor: color.bg,
+    textColor: color.fg,
+    displayName: name || 'Unknown user',
+  }
+}
+
 // Shows one auction and allows authenticated users to bid, comment, and react.
 export function AuctionDetailsPage() {
   const { id: auctionId } = useParams()
@@ -330,15 +381,39 @@ export function AuctionDetailsPage() {
         <h2 className="fin-title text-xl font-bold">Comments</h2>
         <div className="mt-3 space-y-2">
           {(auction.comments ?? []).length > 0 ? (
-            (auction.comments ?? []).map((item) => (
-              <div key={item.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-                <p className="text-sm text-slate-800">{item.content}</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {item.userFullName ?? 'Unknown user'} -{' '}
-                  {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Unknown time'}
-                </p>
-              </div>
-            ))
+            (auction.comments ?? []).map((item) => {
+              const avatar = buildCommentAvatar({
+                fullName: item.userFullName,
+                userName: item.userName,
+                userNickname: item.userNickname,
+                userNickName: item.userNickName,
+                userEmail: item.userEmail,
+              })
+
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
+                >
+                  <div
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase"
+                    style={{ backgroundColor: avatar.backgroundColor, color: avatar.textColor }}
+                    aria-label={`Comment author avatar for ${avatar.displayName}`}
+                    title={avatar.displayName}
+                  >
+                    {avatar.initials}
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-800">{item.content}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {avatar.displayName} -{' '}
+                      {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Unknown time'}
+                    </p>
+                  </div>
+                </div>
+              )
+            })
           ) : (
             <p className="text-sm text-slate-600">No comments yet.</p>
           )}

@@ -1,33 +1,50 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { AdminCommentStatus } from '../../features/admin/model/admin.types'
+import {
+  adminCommentStatuses,
+  formatAdminLabel,
+  formatAdminDate,
+  getStatusBadgeClass,
+  matchesAdminFilter,
+  truncateMiddle,
+  type AdminFilterValue,
+} from '../../features/admin/lib/adminPresentation'
+import { AdminPanelShell } from '../../features/admin/ui/AdminPanelShell'
 import { adminService } from '../../services/adminService'
 import { getApiErrorMessage } from '../../shared/lib/apiError'
 
-const statuses: AdminCommentStatus[] = ['Pending', 'Approved', 'Rejected']
+const statusOptions: Array<AdminFilterValue<AdminCommentStatus>> = ['All', ...adminCommentStatuses]
 
 type CommentAction = 'approve' | 'reject'
 
-// Admin page to review and moderate auction comments.
 export function AdminCommentsPage() {
-  const [status, setStatus] = useState<AdminCommentStatus>('Pending')
+  const [statusFilter, setStatusFilter] = useState<AdminFilterValue<AdminCommentStatus>>('All')
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const commentsQuery = useQuery({
-    queryKey: ['admin-comments', status],
-    queryFn: () => adminService.getComments(status),
+    queryKey: ['admin-comments-registry'],
+    queryFn: async () => {
+      const groups = await Promise.all(
+        adminCommentStatuses.map(async (status) => [status, await adminService.getComments(status)] as const),
+      )
+
+      const dedupedComments = new Map<string, (typeof groups)[number][1][number]>()
+
+      groups.forEach(([, comments]) => {
+        comments.forEach((comment) => {
+          dedupedComments.set(comment.id, comment)
+        })
+      })
+
+      return Array.from(dedupedComments.values())
+    },
   })
 
   const actionMutation = useMutation({
-    mutationFn: async ({
-      commentId,
-      action,
-    }: {
-      commentId: string
-      action: CommentAction
-    }) => {
+    mutationFn: async ({ commentId, action }: { commentId: string; action: CommentAction }) => {
       if (action === 'approve') {
         await adminService.approveComment(commentId)
         return 'Comment approved.'
@@ -38,12 +55,25 @@ export function AdminCommentsPage() {
     },
   })
 
+  const comments = commentsQuery.data ?? []
+  const filteredComments = useMemo(
+    () =>
+      comments.filter((comment) =>
+        statusFilter === 'All' ? true : matchesAdminFilter(comment.status, statusFilter, 'comment'),
+      ),
+    [comments, statusFilter],
+  )
+
+  const pendingCount = comments.filter((comment) => matchesAdminFilter(comment.status, 'pending', 'comment')).length
+  const approvedCount = comments.filter((comment) => matchesAdminFilter(comment.status, 'approved', 'comment')).length
+  const rejectedCount = comments.filter((comment) => matchesAdminFilter(comment.status, 'rejected', 'comment')).length
+
   const handleAction = async (commentId: string, action: CommentAction) => {
     try {
       const message = await actionMutation.mutateAsync({ commentId, action })
       setActionError(null)
       setActionMessage(message)
-      await queryClient.invalidateQueries({ queryKey: ['admin-comments', status] })
+      await queryClient.invalidateQueries({ queryKey: ['admin-comments-registry'] })
     } catch (error) {
       setActionMessage(null)
       setActionError(getApiErrorMessage(error, 'Failed to moderate comment.'))
@@ -51,74 +81,166 @@ export function AdminCommentsPage() {
   }
 
   return (
-    <section className="fin-fade-up space-y-5">
-      <article className="fin-card p-6 md:p-8">
-        <h1 className="fin-title text-2xl font-bold">Admin - Comments</h1>
-        <p className="fin-subtitle mt-2 text-sm">Approve or reject comment submissions.</p>
+    <AdminPanelShell
+      title="Comment moderation"
+      description="Review every comment in one queue, grouped by moderation status and linked back to the auction discussion."
+      summary={[
+        {
+          label: 'All comments',
+          value: commentsQuery.data?.length ?? '--',
+          hint: 'Total comments loaded into the moderation registry',
+          tone: 'blue',
+        },
+        {
+          label: 'Pending',
+          value: commentsQuery.data ? pendingCount : '--',
+          hint: 'Items that still need a moderation decision',
+          tone: 'amber',
+        },
+        {
+          label: 'Approved',
+          value: commentsQuery.data ? approvedCount : '--',
+          hint: 'Visible comments already accepted',
+          tone: 'emerald',
+        },
+        {
+          label: 'Rejected',
+          value: commentsQuery.data ? rejectedCount : '--',
+          hint: 'Comments blocked from public discussion',
+          tone: 'cyan',
+        },
+      ]}
+      toolbar={
+        <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-[0_18px_28px_-28px_rgba(15,23,42,0.9)]">
+          <label className="block text-sm font-semibold text-slate-700">
+            Moderation filter
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as AdminFilterValue<AdminCommentStatus>)}
+              className="fin-input mt-2"
+            >
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="mt-2 text-xs text-slate-500">
+            Switch between the pending queue and the full archive without leaving the page.
+          </p>
+        </div>
+      }
+    >
+      {commentsQuery.isLoading ? (
+        <article className="fin-card p-6 text-sm text-slate-600 md:p-8">Loading comment moderation queue...</article>
+      ) : null}
 
-        <label className="mt-4 block max-w-xs text-sm font-semibold text-slate-700">
-          Filter by status
-          <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value as AdminCommentStatus)}
-            className="fin-input mt-1.5"
-          >
-            {statuses.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {commentsQuery.isLoading ? <p className="mt-4 text-sm text-slate-600">Loading comments...</p> : null}
-        {commentsQuery.isError ? (
-          <p className="mt-4 text-sm font-medium text-rose-700">
+      {commentsQuery.isError ? (
+        <article className="fin-card p-6 md:p-8">
+          <p className="text-sm font-medium text-rose-700">
             {getApiErrorMessage(commentsQuery.error, 'Failed to load comments.')}
           </p>
-        ) : null}
+        </article>
+      ) : null}
 
-        {actionMessage ? <p className="mt-4 text-sm font-medium text-emerald-700">{actionMessage}</p> : null}
-        {actionError ? <p className="mt-2 text-sm font-medium text-rose-700">{actionError}</p> : null}
-      </article>
+      {actionMessage ? (
+        <article className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm font-medium text-emerald-800">
+          {actionMessage}
+        </article>
+      ) : null}
+
+      {actionError ? (
+        <article className="rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm font-medium text-rose-800">
+          {actionError}
+        </article>
+      ) : null}
 
       {!commentsQuery.isLoading && !commentsQuery.isError ? (
-        <div className="space-y-3">
-          {(commentsQuery.data ?? []).map((comment) => (
-            <article key={comment.id} className="fin-card p-5">
-              <p className="text-sm text-slate-900">{comment.content}</p>
-              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">
-                Status: {comment.status} | User: {comment.userFullName ?? 'Unknown'}
+        <article className="fin-card overflow-hidden">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-5 sm:px-6 md:px-8">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Review table
               </p>
+              <h2 className="fin-title mt-2 text-xl font-bold">Comment decisions</h2>
+              <p className="fin-subtitle mt-2 text-sm">
+                Every row gives you content, source auction, author label, creation time, and moderation controls.
+              </p>
+            </div>
+          </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleAction(comment.id, 'approve')}
-                  disabled={actionMutation.isPending}
-                  className="fin-btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Approve
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleAction(comment.id, 'reject')}
-                  disabled={actionMutation.isPending}
-                  className="fin-btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Reject
-                </button>
-              </div>
-            </article>
-          ))}
+          <div className="fin-admin-table-wrap">
+            <table className="fin-admin-table min-w-[980px]">
+              <thead>
+                <tr>
+                  <th>Comment</th>
+                  <th>Comment ID</th>
+                  <th>Auction ID</th>
+                  <th>Author</th>
+                  <th>Created</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredComments.map((comment) => (
+                  <tr key={comment.id}>
+                    <td>
+                      <div className="max-w-[320px]">
+                        <p className="text-sm font-medium text-slate-900">{comment.content}</p>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="font-mono text-xs text-slate-600">{truncateMiddle(comment.id)}</span>
+                    </td>
+                    <td>
+                      <span className="font-mono text-xs text-slate-600">{truncateMiddle(comment.auctionId)}</span>
+                    </td>
+                    <td>
+                      <span className="text-sm text-slate-700">{comment.userFullName ?? 'Unknown user'}</span>
+                    </td>
+                    <td>
+                      <span className="text-sm text-slate-700">{formatAdminDate(comment.createdAt)}</span>
+                    </td>
+                    <td>
+                      <span className={getStatusBadgeClass(comment.status, 'comment')}>
+                        {formatAdminLabel(comment.status, 'comment')}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex min-w-[180px] flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleAction(comment.id, 'approve')}
+                          disabled={actionMutation.isPending}
+                          className="fin-btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleAction(comment.id, 'reject')}
+                          disabled={actionMutation.isPending}
+                          className="fin-btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-          {(commentsQuery.data ?? []).length === 0 ? (
-            <article className="fin-card p-5">
-              <p className="text-sm text-slate-600">No comments found for this status.</p>
-            </article>
+          {filteredComments.length === 0 ? (
+            <div className="border-t border-slate-200 px-5 py-6 text-sm text-slate-600 sm:px-6 md:px-8">
+              No comments found for the selected filter.
+            </div>
           ) : null}
-        </div>
+        </article>
       ) : null}
-    </section>
+    </AdminPanelShell>
   )
 }
