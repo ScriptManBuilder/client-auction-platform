@@ -4,6 +4,13 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuthStore } from '../features/auth/model/authStore'
 import { auctionService } from '../services/auctionService'
 import { getApiErrorMessage } from '../shared/lib/apiError'
+import {
+  formatAuctionCurrency,
+  formatAuctionDate,
+  formatAuctionShortId,
+  formatAuctionStatus,
+  getAuctionStatusTone,
+} from '../shared/lib/auctionPresentation'
 
 const avatarPalette = [
   { bg: '#DBEAFE', fg: '#1E3A8A' },
@@ -15,6 +22,9 @@ const avatarPalette = [
   { bg: '#CCFBF1', fg: '#115E59' },
   { bg: '#EDE9FE', fg: '#5B21B6' },
 ]
+
+const COMMENTS_PAGE_SIZE = 3
+const COMMENT_MAX_LENGTH = 200
 
 const normalize = (value?: string) => value?.trim() ?? ''
 
@@ -64,6 +74,7 @@ export function AuctionDetailsPage() {
 
   const [bidAmount, setBidAmount] = useState('')
   const [comment, setComment] = useState('')
+  const [commentPage, setCommentPage] = useState(1)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -169,9 +180,16 @@ export function AuctionDetailsPage() {
       return
     }
 
+    if (content.length > COMMENT_MAX_LENGTH) {
+      setActionMessage(null)
+      setActionError(`Comment must be ${COMMENT_MAX_LENGTH} characters or less.`)
+      return
+    }
+
     try {
       await commentMutation.mutateAsync(content)
       setComment('')
+      setCommentPage(1)
       setActionError(null)
       setActionMessage('Comment posted successfully.')
       await syncAuctionData()
@@ -198,6 +216,17 @@ export function AuctionDetailsPage() {
       setActionError(getApiErrorMessage(error, 'Failed to send reaction.'))
     }
   }
+
+  const comments = auctionQuery.data?.comments ?? []
+  const totalCommentPages = Math.max(1, Math.ceil(comments.length / COMMENTS_PAGE_SIZE))
+  const activeCommentPage = Math.min(commentPage, totalCommentPages)
+  const commentsStartIndex = (activeCommentPage - 1) * COMMENTS_PAGE_SIZE
+  const visibleComments = comments.slice(
+    commentsStartIndex,
+    commentsStartIndex + COMMENTS_PAGE_SIZE,
+  )
+  const commentLength = comment.length
+  const isCommentTooLong = comment.trim().length > COMMENT_MAX_LENGTH
 
   if (!auctionId) {
     return (
@@ -231,157 +260,348 @@ export function AuctionDetailsPage() {
     )
   }
 
+  const bidHistory = auction.bids ?? []
+  const bidCount = auction.bidsCount ?? bidHistory.length
+  const hasDetailedBidHistory = bidHistory.length > 0
+  const hasBidActivity = bidCount > 0
+  const likesCount = auction.likesCount ?? auction.reactions?.likes ?? 0
+  const dislikesCount = auction.dislikesCount ?? auction.reactions?.dislikes ?? 0
+  const minimumBid = Math.max(auction.currentPrice + 1, auction.startPrice ?? 0)
+
   return (
     <section className="fin-fade-up space-y-6">
-      <article className="fin-card p-4 sm:p-6 md:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <article className="fin-auction-hero-card">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.8fr)] lg:items-start">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Auction Details
+            <div className="flex flex-wrap items-center gap-3">
+              <span className={[
+                'inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]',
+                getAuctionStatusTone(auction.status),
+              ].join(' ')}>
+                {formatAuctionStatus(auction.status)}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Lot {formatAuctionShortId(auction.id)}
+              </span>
+            </div>
+
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Auction details
             </p>
-            <h1 className="fin-title mt-2 text-2xl font-bold sm:text-3xl">{auction.title}</h1>
-            <p className="fin-subtitle mt-2 max-w-3xl text-sm">
+            <h1 className="fin-title mt-3 text-3xl font-bold leading-tight sm:text-4xl">
+              {auction.title}
+            </h1>
+            <p className="fin-subtitle mt-4 max-w-3xl text-sm leading-6 sm:text-base">
               {auction.description ?? 'No description provided.'}
             </p>
+
+            <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <article className="fin-market-stat fin-market-stat-blue">
+                <p className="fin-market-stat-label">Current price</p>
+                <p className="fin-market-stat-value">{formatAuctionCurrency(auction.currentPrice)}</p>
+                <p className="fin-market-stat-copy">Live market position for this lot</p>
+              </article>
+
+              <article className="fin-market-stat fin-market-stat-cyan">
+                <p className="fin-market-stat-label">Ends at</p>
+                <p className="text-lg font-bold tracking-tight text-slate-950">
+                  {formatAuctionDate(auction.endTime)}
+                </p>
+                <p className="fin-market-stat-copy">Scheduled close of the bidding window</p>
+              </article>
+
+              <article className="fin-market-stat fin-market-stat-slate">
+                <p className="fin-market-stat-label">Activity</p>
+                <p className="fin-market-stat-value">{bidCount + comments.length}</p>
+                <p className="fin-market-stat-copy">Combined bids and comment signals</p>
+              </article>
+            </div>
           </div>
 
-          <Link to="/auctions" className="fin-btn-secondary w-full sm:w-auto">
-            Back to list
-          </Link>
-        </div>
+          <aside className="fin-detail-aside">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Execution panel
+            </p>
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+                <span className="text-sm text-slate-500">Listing status</span>
+                <span className="text-sm font-semibold text-slate-900">{formatAuctionStatus(auction.status)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+                <span className="text-sm text-slate-500">Bids registered</span>
+                <span className="text-sm font-semibold text-slate-900">{bidCount}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+                <span className="text-sm text-slate-500">Comments posted</span>
+                <span className="text-sm font-semibold text-slate-900">{(auction.comments ?? []).length}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+                <span className="text-sm text-slate-500">Reaction balance</span>
+                <span className="text-sm font-semibold text-slate-900">{likesCount} / {dislikesCount}</span>
+              </div>
+            </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <article className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
-              Current Price
-            </p>
-            <p className="mt-1 text-2xl font-bold tracking-tight text-blue-900">
-              ${auction.currentPrice.toLocaleString()}
-            </p>
-          </article>
-
-          <article className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-700">
-              Ends At
-            </p>
-            <p className="mt-1 text-sm font-semibold text-cyan-900">
-              {new Date(auction.endTime).toLocaleString()}
-            </p>
-          </article>
-
-          <article className="rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Status
-            </p>
-            <p className="mt-1 text-lg font-bold tracking-tight text-slate-900">
-              {auction.status ?? 'Unknown'}
-            </p>
-          </article>
+            <Link to="/auctions" className="fin-btn-secondary mt-6 w-full">
+              Back to list
+            </Link>
+          </aside>
         </div>
       </article>
 
-      <article className="fin-card p-4 sm:p-6 md:p-8">
-        <h2 className="fin-title text-xl font-bold">Participate</h2>
-        <p className="fin-subtitle mt-2 text-sm">
-          Place a bid, add a comment, or react to this auction.
-        </p>
+      <article className="fin-card p-5 sm:p-6 md:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Participate
+            </p>
+            <h2 className="fin-title mt-2 text-2xl font-bold">Execution actions</h2>
+            <p className="fin-subtitle mt-2 text-sm leading-6">
+              Submit pricing intent, publish a market comment, or register a quick reaction.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
+            Authenticated users can bid, comment, and react in real time.
+          </div>
+        </div>
 
         {!isAuthenticated ? (
-          <p className="mt-3 text-sm font-medium text-amber-700">
+          <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm font-medium text-amber-800">
             You need to <Link to="/login" className="underline">login</Link> to place bids,
             comments, and reactions.
           </p>
         ) : null}
 
-        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <label className="block text-sm font-semibold text-slate-700">Bid amount</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={bidAmount}
-              onChange={(event) => setBidAmount(event.target.value)}
-              className="fin-input mt-1.5"
-              placeholder="1200"
-              disabled={!isAuthenticated || isMutating}
-            />
+        <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <div className="fin-action-card">
+            <div className="fin-action-card-header">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Bid desk</p>
+              <h3 className="fin-title mt-2 text-xl font-bold">Place a bid</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Enter your intended amount and post it directly to the active auction book.
+              </p>
+            </div>
+
+            <div className="fin-action-card-body">
+              <label className="block text-sm font-semibold text-slate-700">Bid amount</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={bidAmount}
+                onChange={(event) => setBidAmount(event.target.value)}
+                className="fin-input fin-input-quiet mt-2"
+                placeholder="1200"
+                disabled={!isAuthenticated || isMutating}
+              />
+
+              <div className="fin-action-card-note mt-4">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Current market level
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {formatAuctionCurrency(auction.currentPrice)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Suggested next bid
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {formatAuctionCurrency(minimumBid)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={() => void handleBidSubmit()}
               disabled={!isAuthenticated || isMutating}
-              className="fin-btn-primary mt-3 w-full disabled:cursor-not-allowed disabled:opacity-60"
+              className="fin-btn-primary mt-5 w-full disabled:cursor-not-allowed disabled:opacity-60"
             >
               Place Bid
             </button>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <label className="block text-sm font-semibold text-slate-700">Comment</label>
-            <textarea
-              value={comment}
-              onChange={(event) => setComment(event.target.value)}
-              className="fin-input mt-1.5 min-h-24"
-              placeholder="Share your thoughts"
-              disabled={!isAuthenticated || isMutating}
-            />
+          <div className="fin-action-card">
+            <div className="fin-action-card-header">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Market note</p>
+              <h3 className="fin-title mt-2 text-xl font-bold">Post a comment</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Add structured context or quick market sentiment to the lot conversation.
+              </p>
+            </div>
+
+            <div className="fin-action-card-body">
+              <label className="block text-sm font-semibold text-slate-700">Comment</label>
+              <textarea
+                value={comment}
+                onChange={(event) => {
+                  setComment(event.target.value)
+
+                  if (actionError === `Comment must be ${COMMENT_MAX_LENGTH} characters or less.`) {
+                    setActionError(null)
+                  }
+                }}
+                className="fin-input fin-input-quiet mt-2 min-h-32 resize-none"
+                placeholder="Share your thoughts"
+                disabled={!isAuthenticated || isMutating}
+                maxLength={COMMENT_MAX_LENGTH}
+              />
+
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <p className="text-xs text-slate-500">
+                  Up to {COMMENT_MAX_LENGTH} characters. Keep comments concise and relevant.
+                </p>
+                <span
+                  className={[
+                    'text-xs font-semibold tabular-nums',
+                    isCommentTooLong ? 'text-rose-700' : 'text-slate-500',
+                  ].join(' ')}
+                >
+                  {commentLength}/{COMMENT_MAX_LENGTH}
+                </span>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={() => void handleCommentSubmit()}
-              disabled={!isAuthenticated || isMutating}
-              className="fin-btn-primary mt-3 w-full disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!isAuthenticated || isMutating || isCommentTooLong}
+              className="fin-btn-primary mt-5 w-full disabled:cursor-not-allowed disabled:opacity-60"
             >
               Post Comment
             </button>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:flex">
+        <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={() => void handleReaction(true)}
             disabled={!isAuthenticated || isMutating}
-            className="fin-btn-secondary w-full sm:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            className="fin-btn-secondary min-w-[10rem] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Like
+            Like · {likesCount}
           </button>
           <button
             type="button"
             onClick={() => void handleReaction(false)}
             disabled={!isAuthenticated || isMutating}
-            className="fin-btn-secondary w-full sm:w-auto disabled:cursor-not-allowed disabled:opacity-60"
+            className="fin-btn-secondary min-w-[10rem] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Dislike
+            Dislike · {dislikesCount}
           </button>
         </div>
 
-        {actionMessage ? <p className="mt-4 text-sm font-medium text-emerald-700">{actionMessage}</p> : null}
-        {actionError ? <p className="mt-2 text-sm font-medium text-rose-700">{actionError}</p> : null}
+        {actionMessage ? <p className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm font-medium text-emerald-800">{actionMessage}</p> : null}
+        {actionError ? <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm font-medium text-rose-800">{actionError}</p> : null}
       </article>
 
-      <article className="fin-card p-4 sm:p-6 md:p-8">
-        <h2 className="fin-title text-xl font-bold">Bids</h2>
-        <div className="mt-3 space-y-2">
-          {(auction.bids ?? []).length > 0 ? (
-            (auction.bids ?? []).map((bid) => (
-              <div key={bid.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-                <p className="text-sm font-semibold text-slate-800">
-                  ${bid.amount.toLocaleString()} by {bid.userFullName ?? 'Unknown bidder'}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <article className="fin-card p-5 sm:p-6 md:p-8">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Bid history</p>
+              <h2 className="fin-title mt-2 text-2xl font-bold">Bids</h2>
+            </div>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              {bidCount}
+            </span>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {hasDetailedBidHistory ? (
+              bidHistory.map((bid) => (
+                <div key={bid.id} className="rounded-[1.35rem] border border-slate-200 bg-slate-50/75 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Registered bid
+                      </p>
+                      <p className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                        {formatAuctionCurrency(bid.amount)}
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-slate-700">
+                        by {bid.userFullName ?? 'Unknown bidder'}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">
+                      Bid
+                    </span>
+                  </div>
+                  <p className="mt-4 text-xs text-slate-500">{formatAuctionDate(bid.createdAt)}</p>
+                </div>
+              ))
+            ) : hasBidActivity ? (
+              <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/75 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Registered bid activity
+                    </p>
+                    <p className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                      {formatAuctionCurrency(auction.currentPrice)}
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-slate-700">
+                      {bidCount} bid{bidCount === 1 ? '' : 's'} recorded for this lot
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Highest bidder id: {auction.highestBidderId ? formatAuctionShortId(auction.highestBidderId) : 'Not available'}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">
+                    Summary
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200/90 bg-white/80 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Opening price
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                      {typeof auction.startPrice === 'number' ? formatAuctionCurrency(auction.startPrice) : 'Not available'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200/90 bg-white/80 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Latest market level
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                      {formatAuctionCurrency(auction.currentPrice)}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-xs leading-5 text-slate-500">
+                  The current auction details endpoint exposes bid totals and top-level summary fields, but not the full bid-by-bid history list.
                 </p>
-                <p className="text-xs text-slate-500">{new Date(bid.createdAt).toLocaleString()}</p>
               </div>
-            ))
-          ) : (
-            <p className="text-sm text-slate-600">No bids yet.</p>
-          )}
-        </div>
-      </article>
+            ) : (
+              <p className="text-sm text-slate-600">No bids yet.</p>
+            )}
+          </div>
+        </article>
 
-      <article className="fin-card p-4 sm:p-6 md:p-8">
-        <h2 className="fin-title text-xl font-bold">Comments</h2>
-        <div className="mt-3 space-y-2">
-          {(auction.comments ?? []).length > 0 ? (
-            (auction.comments ?? []).map((item) => {
+        <article className="fin-card p-5 sm:p-6 md:p-8">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Conversation flow</p>
+              <h2 className="fin-title mt-2 text-2xl font-bold">Comments</h2>
+            </div>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              {(auction.comments ?? []).length}
+            </span>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {comments.length > 0 ? (
+              visibleComments.map((item) => {
               const avatar = buildCommentAvatar({
                 fullName: item.userFullName,
                 userName: item.userName,
@@ -393,10 +613,10 @@ export function AuctionDetailsPage() {
               return (
                 <div
                   key={item.id}
-                  className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
+                  className="flex items-start gap-4 rounded-[1.35rem] border border-slate-200 bg-slate-50/75 p-4"
                 >
                   <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase"
                     style={{ backgroundColor: avatar.backgroundColor, color: avatar.textColor }}
                     aria-label={`Comment author avatar for ${avatar.displayName}`}
                     title={avatar.displayName}
@@ -405,10 +625,15 @@ export function AuctionDetailsPage() {
                   </div>
 
                   <div className="min-w-0">
-                    <p className="text-sm text-slate-800">{item.content}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {avatar.displayName} -{' '}
-                      {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Unknown time'}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{avatar.displayName}</p>
+                      <span className="text-xs text-slate-400">•</span>
+                      <p className="text-xs text-slate-500">
+                        {item.createdAt ? formatAuctionDate(item.createdAt) : 'Unknown time'}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                      {item.content}
                     </p>
                   </div>
                 </div>
@@ -417,8 +642,41 @@ export function AuctionDetailsPage() {
           ) : (
             <p className="text-sm text-slate-600">No comments yet.</p>
           )}
-        </div>
-      </article>
+
+            {comments.length > COMMENTS_PAGE_SIZE ? (
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/80 pt-4">
+                <p className="text-sm text-slate-500">
+                  Showing {commentsStartIndex + 1}-{Math.min(commentsStartIndex + COMMENTS_PAGE_SIZE, comments.length)} of {comments.length} comments
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCommentPage((currentPage) => Math.max(1, currentPage - 1))}
+                    disabled={activeCommentPage === 1}
+                    className="fin-btn-secondary min-w-[7rem] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Previous
+                  </button>
+
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Page {activeCommentPage} / {totalCommentPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setCommentPage((currentPage) => Math.min(totalCommentPages, currentPage + 1))}
+                    disabled={activeCommentPage === totalCommentPages}
+                    className="fin-btn-secondary min-w-[7rem] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </article>
+      </div>
     </section>
   )
 }

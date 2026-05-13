@@ -32,6 +32,13 @@ export interface AuctionReactionsDto {
 }
 
 export interface AuctionDetailsDto extends AuctionListItemDto {
+  startPrice?: number
+  bidsCount?: number
+  likesCount?: number
+  dislikesCount?: number
+  highestBidderId?: string
+  createdAt?: string
+  updatedAt?: string
   bids?: AuctionBidDto[]
   comments?: AuctionCommentDto[]
   reactions?: AuctionReactionsDto

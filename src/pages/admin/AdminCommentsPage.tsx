@@ -17,11 +17,13 @@ import { getApiErrorMessage } from '../../shared/lib/apiError'
 const statusOptions: Array<AdminFilterValue<AdminCommentStatus>> = ['All', ...adminCommentStatuses]
 
 type CommentAction = 'approve' | 'reject'
+const COMMENT_PREVIEW_LENGTH = 220
 
 export function AdminCommentsPage() {
   const [statusFilter, setStatusFilter] = useState<AdminFilterValue<AdminCommentStatus>>('All')
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [expandedCommentIds, setExpandedCommentIds] = useState<string[]>([])
   const queryClient = useQueryClient()
 
   const commentsQuery = useQuery({
@@ -55,7 +57,7 @@ export function AdminCommentsPage() {
     },
   })
 
-  const comments = commentsQuery.data ?? []
+  const comments = useMemo(() => commentsQuery.data ?? [], [commentsQuery.data])
   const filteredComments = useMemo(
     () =>
       comments.filter((comment) =>
@@ -78,6 +80,14 @@ export function AdminCommentsPage() {
       setActionMessage(null)
       setActionError(getApiErrorMessage(error, 'Failed to moderate comment.'))
     }
+  }
+
+  const toggleCommentExpanded = (commentId: string) => {
+    setExpandedCommentIds((currentIds) =>
+      currentIds.includes(commentId)
+        ? currentIds.filter((currentId) => currentId !== commentId)
+        : [...currentIds, commentId],
+    )
   }
 
   return (
@@ -188,7 +198,30 @@ export function AdminCommentsPage() {
                   <tr key={comment.id}>
                     <td>
                       <div className="max-w-[320px]">
-                        <p className="text-sm font-medium text-slate-900">{comment.content}</p>
+                        {(() => {
+                          const isExpanded = expandedCommentIds.includes(comment.id)
+                          const isLongComment = comment.content.length > COMMENT_PREVIEW_LENGTH
+                          const previewContent = isLongComment
+                            ? `${comment.content.slice(0, COMMENT_PREVIEW_LENGTH).trimEnd()}...`
+                            : comment.content
+
+                          return (
+                            <>
+                              <p className="whitespace-pre-wrap break-words text-sm font-medium text-slate-900">
+                                {isExpanded ? comment.content : previewContent}
+                              </p>
+                              {isLongComment ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCommentExpanded(comment.id)}
+                                  className="mt-2 text-xs font-semibold text-sky-700 transition hover:text-sky-900"
+                                >
+                                  {isExpanded ? 'Show less' : 'Show more'}
+                                </button>
+                              ) : null}
+                            </>
+                          )
+                        })()}
                       </div>
                     </td>
                     <td>

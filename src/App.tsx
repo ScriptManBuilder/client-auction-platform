@@ -17,6 +17,7 @@ import { authService } from './services/authService'
 import { isAdminUser } from './shared/lib/authRole'
 import { AdminRoute } from './shared/router/AdminRoute'
 import { ProtectedRoute } from './shared/router/ProtectedRoute'
+import { AppFooter } from './shared/ui/AppFooter'
 import { AppNavbar } from './shared/ui/AppNavbar'
 
 // App coordinates global concerns (navigation + routing + auth state) in one place.
@@ -70,7 +71,7 @@ function App() {
         onLogout={() => logoutMutation.mutate()}
       />
 
-      <main className="fin-main-container">
+      <main className="fin-main-container fin-main-content">
         <Routes>
           <Route path="/" element={<Navigate to="/auctions" replace />} />
           <Route path="/login" element={<LoginPage />} />
@@ -92,6 +93,8 @@ function App() {
           <Route path="*" element={<Navigate to="/auctions" replace />} />
         </Routes>
       </main>
+
+      <AppFooter isAuthenticated={isAuthenticated} isAdmin={isAdmin} />
     </div>
   )
 }

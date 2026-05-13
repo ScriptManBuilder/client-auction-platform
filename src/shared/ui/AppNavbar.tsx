@@ -72,17 +72,17 @@ export function AppNavbar({
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     [
-      'rounded-xl px-4 py-2 text-sm font-semibold transition',
+      'rounded-2xl px-4 py-2.5 text-sm font-semibold transition',
       isActive
-        ? 'bg-blue-600 text-white shadow-[0_12px_18px_-14px_rgba(15,93,227,0.9)]'
-        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900',
+        ? 'bg-[linear-gradient(135deg,#0f5de3,#0a4ac0)] text-white shadow-[0_18px_30px_-22px_rgba(15,93,227,1)]'
+        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
     ].join(' ')
 
   const drawerLinkClass = ({ isActive }: { isActive: boolean }) =>
     [
       'block rounded-xl px-4 py-3 text-sm font-semibold transition',
       isActive
-        ? 'bg-blue-600 text-white'
+        ? 'bg-[linear-gradient(135deg,#0f5de3,#0a4ac0)] text-white'
         : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900',
     ].join(' ')
 
@@ -98,51 +98,66 @@ export function AppNavbar({
   return (
     <>
       <header className="fin-header-glass sticky top-0 z-40">
-        <nav className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-2.5 py-2.5 sm:px-4 sm:py-4 md:px-6">
+        <nav className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-2.5 py-3 sm:px-4 sm:py-4 md:px-6">
           <Link to="/auctions" className="group inline-flex items-center gap-3" onClick={closeMenu}>
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 text-xs font-bold text-white shadow-lg shadow-blue-200 sm:h-10 sm:w-10 sm:text-sm">
+            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[linear-gradient(135deg,#0f5de3,#12c3d7)] text-xs font-bold text-white shadow-[0_18px_28px_-18px_rgba(15,93,227,1)] sm:h-11 sm:w-11 sm:text-sm">
               AH
             </span>
             <span className="min-w-0 max-w-[9rem] sm:max-w-none">
               <span className="fin-title block truncate text-[1.02rem] font-bold leading-none sm:text-lg">
                 AuctionHub
               </span>
-              <span className="fin-brand-subtitle block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-[11px] sm:tracking-[0.18em]">
-                Capital Markets
+              <span className="fin-brand-subtitle block text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 sm:text-[11px]">
+                Enterprise Market Desk
               </span>
             </span>
           </Link>
 
-          <div className="hidden items-center gap-2 lg:flex">
-            <NavLink to="/auctions" className={linkClass}>
-              Auctions
-            </NavLink>
-
-            {isAdmin ? (
-              <NavLink to="/admin" className={linkClass}>
-                Admin Hub
+          <div className="hidden items-center gap-3 lg:flex">
+            <div className="flex items-center gap-1.5 rounded-[1.5rem] border border-slate-200/80 bg-white/86 p-1.5 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.95)]">
+              <NavLink to="/auctions" className={linkClass}>
+                Auctions
               </NavLink>
-            ) : null}
 
-            {!isAuthenticated ? (
-              <>
-                <NavLink to="/login" className={linkClass}>
-                  Login
+              {isAdmin ? (
+                <NavLink to="/admin" className={linkClass}>
+                  Admin Hub
                 </NavLink>
-                <NavLink to="/register" className={linkClass}>
-                  Register
-                </NavLink>
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
+              ) : null}
+
+              {!isAuthenticated ? (
+                <>
+                  <NavLink to="/login" className={linkClass}>
+                    Login
+                  </NavLink>
+                  <NavLink to="/register" className={linkClass}>
+                    Register
+                  </NavLink>
+                </>
+              ) : null}
+            </div>
+
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2 rounded-[1.5rem] border border-slate-200/80 bg-white/90 px-2 py-1.5 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.95)]">
+                <div className="px-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Session
+                  </p>
+                  <p className="max-w-[10rem] truncate text-sm font-semibold text-slate-900">
+                    {userName ?? 'Active account'}
+                  </p>
+                </div>
+
                 <NavLink to="/account" className={linkClass}>
                   Account
                 </NavLink>
+
                 {isAdminSection ? (
-                  <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
+                  <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">
                     Admin mode
                   </span>
                 ) : null}
+
                 <button
                   type="button"
                   onClick={onLogout}
@@ -152,7 +167,7 @@ export function AppNavbar({
                   {isLoggingOut ? 'Logging out...' : 'Logout'}
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2 lg:hidden">
