@@ -71,4 +71,25 @@ export const adminService = {
   async finishAuction(auctionId: string) {
     await apiClient.patch(`/api/admin/auctions/${auctionId}/finish`)
   },
+
+  async uploadAuctionMainPhoto(auctionId: string, file: File) {
+    const formData = new FormData()
+    formData.append('Photo', file)
+
+    const { data } = await apiClient.post<AdminAuctionDto>(
+      `/api/admin/auctions/${auctionId}/main-photo`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    )
+
+    return data
+  },
+
+  async deleteAuctionMainPhoto(auctionId: string) {
+    await apiClient.delete(`/api/admin/auctions/${auctionId}/main-photo`)
+  },
 }

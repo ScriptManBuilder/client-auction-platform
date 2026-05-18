@@ -3,4 +3,5 @@ export interface Auction {
   title: string
   currentPrice: number
   endTime: string
+  mainImageUrl?: string
 }

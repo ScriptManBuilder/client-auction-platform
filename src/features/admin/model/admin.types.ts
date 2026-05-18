@@ -30,4 +30,5 @@ export interface AdminAuctionDto {
   status: AdminAuctionStatus | string
   currentPrice?: number
   endTime?: string
+  mainImageUrl?: string
 }

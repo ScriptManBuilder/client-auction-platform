@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { auctionService } from '../services/auctionService'
 import {
@@ -10,6 +11,43 @@ import {
   getAuctionStatusTone,
 } from '../shared/lib/auctionPresentation'
 import { getApiErrorMessage } from '../shared/lib/apiError'
+
+interface AuctionPreviewImageProps {
+  title: string
+  mainImageUrl?: string
+}
+
+function AuctionPreviewImage({ title, mainImageUrl }: AuctionPreviewImageProps) {
+  const [imageLoadFailed, setImageLoadFailed] = useState(false)
+
+  useEffect(() => {
+    setImageLoadFailed(false)
+  }, [mainImageUrl])
+
+  const canRenderImage = Boolean(mainImageUrl?.trim()) && !imageLoadFailed
+
+  return (
+    <div className="relative mt-4 h-44 overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-100">
+      {canRenderImage ? (
+        <img
+          src={mainImageUrl}
+          alt={`Photo of ${title}`}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setImageLoadFailed(true)}
+        />
+      ) : (
+        <div className="grid h-full place-items-center bg-gradient-to-br from-slate-100 via-slate-50 to-cyan-50 px-4 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Photo unavailable
+          </p>
+        </div>
+      )}
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-900/20 to-transparent" />
+    </div>
+  )
+}
 
 // Public page that lists all auctions from GET /api/auctions.
 export function AuctionsPage() {
@@ -137,6 +175,11 @@ export function AuctionsPage() {
 
                   <div className="fin-auction-card-orb" />
                 </div>
+
+                <AuctionPreviewImage
+                  title={auction.title}
+                  mainImageUrl={auction.mainImageUrl}
+                />
 
                 <p className="mt-4 text-sm leading-6 text-slate-600">
                   {auction.description?.trim() || 'A curated premium lot with active bidding access and live market participation.'}

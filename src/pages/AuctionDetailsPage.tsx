@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuthStore } from '../features/auth/model/authStore'
 import { auctionService } from '../services/auctionService'
@@ -77,6 +77,7 @@ export function AuctionDetailsPage() {
   const [commentPage, setCommentPage] = useState(1)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [imageLoadFailed, setImageLoadFailed] = useState(false)
 
   const auctionQuery = useQuery({
     queryKey: ['auction-details', auctionId],
@@ -228,6 +229,10 @@ export function AuctionDetailsPage() {
   const commentLength = comment.length
   const isCommentTooLong = comment.trim().length > COMMENT_MAX_LENGTH
 
+  useEffect(() => {
+    setImageLoadFailed(false)
+  }, [auctionQuery.data?.mainImageUrl])
+
   if (!auctionId) {
     return (
       <section className="fin-card p-6">
@@ -267,12 +272,38 @@ export function AuctionDetailsPage() {
   const likesCount = auction.likesCount ?? auction.reactions?.likes ?? 0
   const dislikesCount = auction.dislikesCount ?? auction.reactions?.dislikes ?? 0
   const minimumBid = Math.max(auction.currentPrice + 1, auction.startPrice ?? 0)
+  const hasMainImage = Boolean(auction.mainImageUrl?.trim()) && !imageLoadFailed
 
   return (
     <section className="fin-fade-up space-y-6">
       <article className="fin-auction-hero-card">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.8fr)] lg:items-start">
           <div>
+            <div className="relative mb-5 h-56 overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-100 sm:h-64">
+              {hasMainImage ? (
+                <img
+                  src={auction.mainImageUrl}
+                  alt={`Main photo for ${auction.title}`}
+                  className="h-full w-full object-cover"
+                  loading="eager"
+                  onError={() => setImageLoadFailed(true)}
+                />
+              ) : (
+                <div className="grid h-full place-items-center bg-gradient-to-br from-slate-100 via-slate-50 to-cyan-50 px-4 text-center">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Main photo
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-slate-600">
+                      Not uploaded yet
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-900/25 to-transparent" />
+            </div>
+
             <div className="flex flex-wrap items-center gap-3">
               <span className={[
                 'inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]',

@@ -17,16 +17,10 @@ export function registerUnauthorizedHandler(handler: () => void) {
 
 export const apiClient = axios.create({
   baseURL: env.apiUrl,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 const refreshClient = axios.create({
   baseURL: env.apiUrl,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 function forceLogout() {

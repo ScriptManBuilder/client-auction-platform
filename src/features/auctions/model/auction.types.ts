@@ -3,6 +3,7 @@ export interface AuctionListItemDto {
   title: string
   currentPrice: number
   endTime: string
+  mainImageUrl?: string
   description?: string
   status?: string
 }
